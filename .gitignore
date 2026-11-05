@@ -1,0 +1,4 @@
+.venv/
+modelos/*.pth
+__pycache__/
+salida*.png
