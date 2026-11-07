@@ -1,4 +1,6 @@
 .venv/
 modelos/*.pth
 __pycache__/
+entrada.jpg
 salida*.png
+entrada.jpg
