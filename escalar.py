@@ -31,7 +31,8 @@ def escalar_por_bloques(modelo, tensor, tile=256, pad=16):
             py2, px2 = min(y2 + pad, h), min(x2 + pad, w)
 
             # Esta parte es la única que viaja a la GPU
-            bloque = tensor[:, :, py1:py2, px1:px2].cuda()
+            bloque = tensor[:, :, py1:py2, px1:px2].to(
+                modelo.device, modelo.dtype)
             out = modelo(bloque)
 
             # Recortar el margen del resultado (ya escalado x s)
@@ -40,7 +41,7 @@ def escalar_por_bloques(modelo, tensor, tile=256, pad=16):
 
             # Pegar en su lugar dentro de la imagen final
             salida[:, :, y * s:y2 * s, x * s:x2 *
-                   s] = out[:, :, oy1:oy2, ox1:ox2].cpu()
+                   s] = out[:, :, oy1:oy2, ox1:ox2].float().cpu()
 
             n += 1
             print(f"\rBloque {n}/{total}", end="")
@@ -52,9 +53,17 @@ def escalar_por_bloques(modelo, tensor, tile=256, pad=16):
 modelo = ModelLoader().load_from_file("modelos/RealESRGAN_x4plus.pth")
 assert isinstance(
     modelo, ImageModelDescriptor), "Esto no es un modelo de imágen"
-modelo.cuda().eval()
 
-print(f"Modelo: {modelo.architecture.name} | escala x{modelo.scale}")
+# Usa la GPU si hay, si no hay se usa la CPU
+dispositivo = "cuda" if torch.cuda.is_available() else "cpu"
+modelo.to(dispositivo).eval()
+
+# Media precisión solo si hay GPU y el modelo lo soporta
+if dispositivo == "cuda" and modelo.supports_half:
+    modelo.half()
+
+print(f"Modelo: {modelo.architecture.name} | escala x{modelo.scale} | " f"{modelo.device} | {modelo.dtype}")
+
 
 # 2. Imagen -> Tensor
 img = Image.open("entrada.jpg").convert("RGB")
