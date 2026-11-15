@@ -7,14 +7,18 @@ modelo = cargar_modelo("modelos/RealESRGAN_x4plus.pth")
 print(f"Modelo listo: {modelo.device} ({modelo.dtype})")
 
 
-def procesar(imagen, tile):
+def procesar(imagen, tile, progress=gr.Progress()):
     """Se ejecuta cada que el usuario da click en 'Escalar'"""
     if imagen is None:
         raise gr.Error("Debe subirse una imagen")
 
+    def al_avanzar(n, total):
+        progress(n / total, desc=f"Bloque {n}/{total}")
+
     # Tiempo
     inicio = time.time()
-    resultado = escalar_imagen(modelo, imagen, tile=int(tile))
+    resultado = escalar_imagen(
+        modelo, imagen, tile=int(tile), al_avanzar=al_avanzar)
     segundos = time.time() - inicio
 
     # Imagen
