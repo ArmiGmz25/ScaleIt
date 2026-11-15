@@ -5,6 +5,7 @@ import time
 from PIL import Image
 # para cargar y ejecutar de manera automática modelos
 from spandrel import ImageModelDescriptor, ModelLoader
+from typing import Callable
 
 
 def cargar_modelo(ruta: str) -> ImageModelDescriptor:
@@ -29,6 +30,7 @@ def escalar_por_bloques(
     tensor: torch.Tensor,
     tile: int = 256,
     pad: int = 16,
+    al_avanzar: Callable[[int, int], None] | None = None,
 ) -> torch.Tensor:
     """Escala un tensor [1, C, H, W] por bloques para no llenar la VRAM"""
     _, c, h, w = tensor.shape
@@ -64,8 +66,8 @@ def escalar_por_bloques(
                    s] = out[:, :, oy1:oy2, ox1:ox2].float().cpu()
 
             n += 1
-            print(f"\rBloque {n}/{total}", end="")
-    print()
+            if al_avanzar is not None:
+                al_avanzar(n, total)
     return salida
 
 
@@ -73,6 +75,7 @@ def escalar_imagen(
     modelo: ImageModelDescriptor,
     img: Image.Image,
     tile: int = 256,
+    al_avanzar: Callable[[int, int], None] | None = None,
 ) -> Image.Image:
     """Recibe una imágen de PIL y regresa la versión escalada"""
     # Imagen -> tensor
@@ -81,7 +84,8 @@ def escalar_imagen(
     tensor = torch.from_numpy(arr).permute(2, 0, 1).unsqueeze(0)
 
     # Escalar
-    salida = escalar_por_bloques(modelo, tensor, tile=tile)
+    salida = escalar_por_bloques(
+        modelo, tensor, tile=tile, al_avanzar=al_avanzar)
 
     # Tensor -> imagen
     arr_out = salida.squeeze(0).permute(1, 2, 0).numpy()
@@ -97,7 +101,9 @@ if __name__ == "__main__":
 
     img = Image.open("entrada.jpg")
     inicio = time.time()
-    resultado = escalar_imagen(modelo, img)
+    resultado = escalar_imagen(modelo, img, al_avanzar=lambda n, total: print(
+        f"\rBloque {n}/{total}", end=""),)
+    print()
     print(f"tiempo: {time.time() - inicio:.1f} s")
 
     resultado.save("salida.png")
